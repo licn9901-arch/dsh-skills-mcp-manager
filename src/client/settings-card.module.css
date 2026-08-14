@@ -76,6 +76,11 @@
 .toggleLabel { font-size: 13px; font-weight: 600; }
 .hint { color: rgba(128, 128, 128, 1); font-size: 12px; margin: 0; }
 
+/* settings page (first-class section) */
+.sectionPage { display: flex; flex-direction: column; gap: 12px; }
+.pageHeading { margin: 0; font-size: 16px; font-weight: 600; }
+.pageIntro { margin: 0; color: rgba(128, 128, 128, 1); font-size: 13px; }
+
 /* manager */
 .manager { display: flex; flex-direction: column; gap: 14px; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid rgba(128, 128, 128, 0.25); }

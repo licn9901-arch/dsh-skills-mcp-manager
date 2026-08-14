@@ -1,29 +1,27 @@
 /**
- * The skills-mcp-manager settings card: a disclosure card contributed to the
- * Web UI plugin group. It renders the skills/MCP management UI directly — the
- * plugin does NOT read its own settings namespace (third-party namespaces are
- * not exposed to the browser settings surface), so there is no master-switch
- * card here; the manager is always shown when the card is expanded.
+ * The skills-mcp-manager settings section: a first-class settings page (a
+ * `settings.section` entry, a sibling of the Plugins page) that renders the
+ * skills/MCP management UI directly. The plugin does NOT read its own settings
+ * namespace (third-party namespaces are not exposed to the browser settings
+ * surface), so there is no master-switch here; the manager is always shown.
  */
 
-import { useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { SkillsMcpManager } from './manager.tsx'
 import css from './settings-card.module.css'
 
-/** Props the renderer binds for the card. */
-export type SkillsMcpSettingsCardProps =
-  PropsRuntime<'settings.plugin.item'>
+/** Props the renderer binds for the section. */
+export type SkillsMcpSectionProps =
+  PropsRuntime<'settings.section'>
   & PropsLocale<'skills-mcp-manager'>
   & InjectFace<{ pickDirectory: () => Promise<string | null> }>
 
 /**
- * Render the settings card.
- * @param props - locale copy and the native directory-picker helper.
- * @returns the card.
+ * Render the settings section content.
+ * @param props - locale copy, the shell's close action, and the picker helper.
+ * @returns the section page.
  */
-export function SkillsMcpSettingsCard(props: SkillsMcpSettingsCardProps) {
-  const [open, setOpen] = useState(false)
+export function SkillsMcpSection(props: SkillsMcpSectionProps) {
   const { t } = props
 
   // Current workspace path → project-level skills root.
@@ -33,29 +31,11 @@ export function SkillsMcpSettingsCard(props: SkillsMcpSettingsCardProps) {
     return ws ? ws.path : ''
   })
 
-  const title = t('title')
   return (
-    <li className={css.card}>
-      <button
-        type="button"
-        className={css.header}
-        aria-expanded={open}
-        aria-label={t(open ? 'collapse' : 'expand') + ': ' + title}
-        onClick={() => { setOpen(!open) }}
-      >
-        <span className={css.headText}>
-          <span className={css.name}>{title}</span>
-          <span className={css.description}>{t('description')}</span>
-        </span>
-        <span className={open ? css.chevronOpen : css.chevron}>▾</span>
-      </button>
-      {open
-        ? (
-          <div className={css.body}>
-            <SkillsMcpManager cwd={cwd} enabled={true} pickDirectory={props.pickDirectory} />
-          </div>
-        )
-        : null}
-    </li>
+    <div className={css.sectionPage}>
+      <h2 className={css.pageHeading}>{t('title')}</h2>
+      <p className={css.pageIntro}>{t('description')}</p>
+      <SkillsMcpManager cwd={cwd} enabled={true} pickDirectory={props.pickDirectory} />
+    </div>
   )
 }

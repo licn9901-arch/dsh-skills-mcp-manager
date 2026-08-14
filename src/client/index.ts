@@ -1,14 +1,13 @@
 /**
  * Browser-half entry for the dsh-skills-mcp-manager plugin — runs inside the
  * dsh web GUI. Registers the locale dictionary and contributes a first-class
- * card into the official plugin configuration section (the
- * settings.plugin.item slot, alongside Shell / Agent loop / Web search),
- * not into any third-party group. The card hosts the skills/MCP management
- * UI, which talks to the Host over /api/dsh-skills-mcp.
+ * settings PAGE (a settings.section entry, a sibling of the Plugins page),
+ * not a card inside any group. The page hosts the skills/MCP management UI,
+ * which talks to the Host over /api/dsh-skills-mcp.
  *
  * Deliberately does NOT bind the settingsScope: third-party settings
  * namespaces are not exposed to the browser configuration surface, so a
- * settings-scope-backed card would render an empty shell. The manager is
+ * settings-scope-backed section would render an empty shell. The manager is
  * shown directly instead.
  *
  * Failure policy: mounting problems are logged, never thrown — the web shell
@@ -21,10 +20,10 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-// Type-only: pulls the official settings.plugin.item slot declaration.
-import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
+// Type-only: pulls the official settings.section slot declaration.
+import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { en, zh, type SkillsMcpKey } from './locales.ts'
-import { SkillsMcpSettingsCard } from './SettingsCard.tsx'
+import { SkillsMcpSection } from './SettingsCard.tsx'
 
 /** Locale namespace this plugin owns. */
 const NS = 'skills-mcp-manager'
@@ -40,17 +39,18 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export const inject = ['slots', 'workspaces', 'locale']
 
 /**
- * Mount the settings card.
+ * Mount the settings page.
  * @param ctx - client root context (slots, workspaces, locale).
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'skills-mcp-manager: dictionaries')
 
-  ctx.slots.inject('settings.plugin.item', () => ctx.slots.register({
-    name: 'settings.plugin.item',
-    id: 'skills-mcp-manager',
-    order: 100,
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'skills-mcp',
+    order: 20,
+    label: () => ctx.locale.bind(NS)('title'),
     locale: NS,
     inject: () => ({ pickDirectory: () => ctx.workspaces.pickDirectory() }),
-  }, SkillsMcpSettingsCard))
+  }, SkillsMcpSection))
 }
