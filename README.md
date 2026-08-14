@@ -1,6 +1,6 @@
 # dsh-skills-mcp-manager
 
-一个独立的 DeepSeek Harness Web 插件：在 Web GUI 的「设置」页新增一张「技能与 MCP」卡片，用于管理技能（skills）与 MCP 服务器。
+一个独立的 DeepSeek Harness Web 插件：在 Web GUI 的「设置」页新增一个独立的「技能与 MCP」页面（一级导航入口，与「插件」等并列），用于管理技能（skills）与 MCP 服务器。
 
 MCP 是**真实连接**：启用的服务器会通过 @deepseek-ai/dsh-mcp-client 真正连上，并把工具注册为 mcp__<server>__<tool>；启用 / 禁用会实际连接 / 断开。
 
@@ -28,7 +28,7 @@ MCP 是**真实连接**：启用的服务器会通过 @deepseek-ai/dsh-mcp-clien
 
 插件发布到 npm 后，一行命令装进 web profile，重启即生效：
 
-    dsh plugin --profile web add @zebbkira/dsh-skills-mcp-manager@0.1.0
+    dsh plugin --profile web add @zebbkira/dsh-skills-mcp-manager@0.1.3
     dsh web
 
 dsh plugin 会把包装进 profile 并自动把它加入插件层（本包在 package.json 里声明了 dsh.bundle.patch），无需手动改任何配置。
@@ -59,7 +59,7 @@ Windows PowerShell 下把第 3 步的 $(pwd) 换成完整路径，例如：
 
 ## 使用
 
-安装并重启后，打开 DeepSeek Harness Web GUI，进入「设置 → Web UI 插件 → 技能与 MCP」，即可看到管理卡片。
+安装并重启后，打开 DeepSeek Harness Web GUI，打开「设置」，在左侧导航选择「技能与 MCP」（与「插件」并列的一级入口），即可看到管理界面。
 
 ## 目录结构
 
@@ -71,7 +71,7 @@ Windows PowerShell 下把第 3 步的 $(pwd) 换成完整路径，例如：
       protocol.ts                 # 共享类型与 API 路径
       client/
         index.ts                  # 浏览器半区入口
-        SettingsCard.tsx          # 设置卡片
+        SettingsCard.tsx          # 设置页面（一级入口的内容）
         manager.tsx               # Skills / MCP 管理界面
         api.ts                    # fetch 客户端
         locales.ts                # 双语字典
@@ -85,7 +85,7 @@ Windows PowerShell 下把第 3 步的 $(pwd) 换成完整路径，例如：
 Host 半区的 MCP 管理器在启动 / 保存配置时，把「已启用服务器」收敛成一组活跃连接：
 
 - 每个启用的服务器通过 ctx.plugin(@deepseek-ai/dsh-mcp-client, config) 挂载一个实例，工具注册为 mcp__<server>__<tool>。
-- 连接失败会在卡片上显示原因，点「测试连接」或重新保存可重试。
+- 连接失败会在页面显示原因，点「测试连接」或重新保存可重试。
 - 禁用 / 删除会断开连接并注销该服务器的全部工具。
 
 服务器名（name）即 mcp-client 的命名空间，受 [A-Za-z0-9_-]{1,32} 约束且需全局唯一。
