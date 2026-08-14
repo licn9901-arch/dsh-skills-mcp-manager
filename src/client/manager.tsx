@@ -85,6 +85,8 @@ function SkillsPanel(props: { cwd: string; refreshKey: number; onChanged: () => 
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [enabledFilter, setEnabledFilter] = useState<'all' | 'enabled' | 'disabled'>('all')
 
   const load = () => {
     setList({ loading: true, items: [], error: '' })
@@ -169,8 +171,15 @@ function SkillsPanel(props: { cwd: string; refreshKey: number; onChanged: () => 
     })
   }
 
+  const q = query.trim().toLowerCase()
+  const filtered = list.items.filter((it) => {
+    if (q !== '' && !it.name.toLowerCase().includes(q)) return false
+    if (enabledFilter === 'enabled' && !it.enabled) return false
+    if (enabledFilter === 'disabled' && it.enabled) return false
+    return true
+  })
   const byLevel: Record<string, SkillSummary[]> = {}
-  list.items.forEach((it) => { (byLevel[it.level] = byLevel[it.level] || []).push(it) })
+  filtered.forEach((it) => { (byLevel[it.level] = byLevel[it.level] || []).push(it) })
 
   const rows: ReactNode[] = []
   ;[['project', '项目级'], ['user', '用户级']].forEach(([level, label]) => {
@@ -245,11 +254,19 @@ function SkillsPanel(props: { cwd: string; refreshKey: number; onChanged: () => 
           <div className={css.hGrow}>技能列表</div>
           <button type="button" className={css.btn} onClick={load}>刷新</button>
         </div>
+        <div className={css.inline}>
+          <input className={css.inputGrow} placeholder="搜索技能名称…" value={query} onChange={(e) => { setQuery(e.target.value) }} />
+          <select className={css.filterSelect} value={enabledFilter} onChange={(e) => { setEnabledFilter(e.target.value as 'all' | 'enabled' | 'disabled') }}>
+            <option value="all">全部</option>
+            <option value="enabled">已启用</option>
+            <option value="disabled">未启用</option>
+          </select>
+        </div>
         {msg ? <div className={css.error}>{msg}</div> : null}
         {list.error ? <div className={css.error}>{list.error}</div> : null}
         {list.loading
           ? <div>加载中…</div>
-          : (list.items.length === 0 ? <div>没有发现技能</div> : rows)}
+          : (filtered.length === 0 ? <div>{list.items.length === 0 ? '没有发现技能' : '没有匹配的技能'}</div> : rows)}
       </div>
     </div>
   )
@@ -261,6 +278,7 @@ function McpPanel(props: { refreshKey: number; onChanged: () => void }) {
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
 
   const load = () => {
     setList({ loading: true, servers: [], error: '' })
@@ -340,17 +358,23 @@ function McpPanel(props: { refreshKey: number; onChanged: () => void }) {
     connecting: '连接中', running: '运行中', failed: '失败', stopped: '已停止',
   }
 
+  const mq = query.trim().toLowerCase()
+  const filteredServers = list.servers.filter((s) => mq === '' || s.name.toLowerCase().includes(mq))
+
   return (
     <div className={css.panel}>
       <div className={css.section}>
-        <div className={css.h}>MCP 服务器</div>
+        <div className={css.inline}>
+          <div className={css.hGrow}>MCP 服务器</div>
+          <input className={css.inputGrow} placeholder="搜索服务器名称…" value={query} onChange={(e) => { setQuery(e.target.value) }} />
+        </div>
         {msg ? <div className={css.error}>{msg}</div> : null}
         {list.error ? <div className={css.error}>{list.error}</div> : null}
         {list.loading
           ? <div>加载中…</div>
-          : (list.servers.length === 0
-            ? <div>尚未配置任何 MCP 服务器</div>
-            : list.servers.map((s) => (
+          : (filteredServers.length === 0
+            ? <div>{list.servers.length === 0 ? '尚未配置任何 MCP 服务器' : '没有匹配的服务器'}</div>
+            : filteredServers.map((s) => (
                 <div key={s.name} className={css.row}>
                   <div className={css.main}>
                     <div className={css.name}>{s.name}{s.enabled ? '' : ' （已禁用）'} <span className={css.status}>{statusLabel[s.status] || s.status}</span></div>
