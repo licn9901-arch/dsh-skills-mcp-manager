@@ -8,9 +8,8 @@
 # `dsh.client` declaration in package.json makes the browser half
 # (exports "./client", served at /plugins/<id>/client.js) load in the web GUI.
 #
-# Rename the `name` to match the scope you publish under (e.g.
-# '@linxin666/dsh-skills-mcp-manager') and keep `id` stable — the user's own
-# ~/.dsh/cordis.patch.yml toggles the row by this id.
+# `id` is the row the user's own ~/.dsh/cordis.patch.yml toggles (keep it
+# stable); `name` is the published package name and must match package.json.
 - insert:
     - id: ui-skills-mcp-manager
       name: '@zebbkira/dsh-skills-mcp-manager'
