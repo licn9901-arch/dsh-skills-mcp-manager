@@ -5,7 +5,7 @@
     "url": "git+https://github.com/zebbkira/dsh-skills-mcp-manager.git"
   },
   "description": "Skills & MCP manager for the dsh web GUI: browse/enable/import/delete skills across project and user roots, and manage MCP servers with a REAL connection through @deepseek-ai/dsh-mcp-client (enabled servers connect and register their tools on ctx.tools; enable/disable actually connects/disconnects). Hot-pluggable — mounted via a profile bundle patch + node_modules symlink, no dsh source changes.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
