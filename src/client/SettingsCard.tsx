@@ -13,7 +13,7 @@ import css from './settings-card.module.css'
 
 /** Props the renderer binds for the card. */
 export type SkillsMcpSettingsCardProps =
-  PropsRuntime<'web-ui.plugin.item'>
+  PropsRuntime<'settings.plugin.item'>
   & PropsLocale<'skills-mcp-manager'>
   & InjectFace<{ pickDirectory: () => Promise<string | null> }>
 
