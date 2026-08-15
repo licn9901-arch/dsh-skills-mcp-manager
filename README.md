@@ -5,6 +5,7 @@
 本插件是其中一个独立插件：在 DeepSeek Harness Web GUI 的「设置」页新增一个独立的「技能与 MCP」页面（一级导航入口，与「插件」等并列），用于管理技能（skills）与 MCP 服务器。
 
 MCP 是**真实连接**：启用的服务器会通过 @deepseek-ai/dsh-mcp-client 真正连上，并把工具注册为 mcp__<server>__<tool>；启用 / 禁用会实际连接 / 断开。
+<img width="778" height="789" alt="image" src="https://github.com/user-attachments/assets/f7492576-e806-427d-97e9-b3ec1d6770f7" />
 
 ## 功能
 
