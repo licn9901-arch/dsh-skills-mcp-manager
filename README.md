@@ -1,6 +1,6 @@
 # DSH Desktop Skills & MCP Manager
 
-由 [DeepSeek Harness Desktop](https://github.com/licn9901-arch/DSH-Desktop) 维护的 Skills 与 MCP 管理插件。项目 Fork 自 `zebbkira/dsh-skills-mcp-manager`，`0.2.0` 起使用 `@dsh-desktop/skills-mcp-manager` 包身份，并保持原有 Host API 与配置文件兼容。
+由 [DeepSeek Harness Desktop](https://github.com/licn9901-arch/DSH-Desktop) 维护的 Skills 与 MCP 管理插件。项目 Fork 自 `zebbkira/dsh-skills-mcp-manager`，当前以 `@cubee-slide/skills-mcp-manager` 包身份发布，并保持原有 Host API 与配置文件兼容。
 
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 是 DeepSeek 官方的 AI 编程助手框架，命令行工具叫 `dsh`，提供 Web UI、Headless 等运行模式，并通过插件机制扩展能力。
 

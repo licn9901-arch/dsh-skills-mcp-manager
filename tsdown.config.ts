@@ -22,6 +22,7 @@ export default defineConfig([
     clean: false,
     sourcemap: false,
     platform: 'browser',
+    deps: { alwaysBundle: [/^lucide-react(?:\/|$)/] },
     css: { inject: true },
   },
 ])

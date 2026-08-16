@@ -1,11 +1,11 @@
 {
-  "name": "@dsh-desktop/skills-mcp-manager",
+  "name": "@cubee-slide/skills-mcp-manager",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/licn9901-arch/dsh-skills-mcp-manager.git"
   },
   "description": "Desktop-maintained Skills and MCP manager for the DeepSeek Harness web UI.",
-  "version": "0.2.0",
+  "version": "0.2.3",
   "type": "module",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
@@ -98,8 +98,8 @@
   ],
   "license": "MIT",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && tsdown && node scripts/wrap-client.mjs",
-    "bundle": "tsdown && node scripts/wrap-client.mjs",
+    "build": "tsc -p tsconfig.build.json && tsdown && node scripts/wrap-client.mjs && node scripts/verify-client-bundle.mjs",
+    "bundle": "tsdown && node scripts/wrap-client.mjs && node scripts/verify-client-bundle.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "watch": "tsdown --watch",
