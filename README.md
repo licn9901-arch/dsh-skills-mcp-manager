@@ -1,4 +1,6 @@
-# dsh-skills-mcp-manager
+# DSH Desktop Skills & MCP Manager
+
+由 [DeepSeek Harness Desktop](https://github.com/licn9901-arch/DSH-Desktop) 维护的 Skills 与 MCP 管理插件。项目 Fork 自 `zebbkira/dsh-skills-mcp-manager`，`0.2.0` 起使用 `@dsh-desktop/skills-mcp-manager` 包身份，并保持原有 Host API 与配置文件兼容。
 
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 是 DeepSeek 官方的 AI 编程助手框架，命令行工具叫 `dsh`，提供 Web UI、Headless 等运行模式，并通过插件机制扩展能力。
 
@@ -20,7 +22,7 @@ MCP 是**真实连接**：启用的服务器会通过 @deepseek-ai/dsh-mcp-clien
 
 ### MCP 服务
 
-- 表单或 JSON 两种方式新建服务器（stdio 的 command/args/env/cwd，或 streamable-http 的 url/headers）。
+- 使用单一 JSON 编辑器新建和修改服务器，完整支持 stdio 与 streamable-http 配置，不再提供容易产生字段差异的表单模式。
 - 测试连接：一键真实连接探测。
 - 启用 / 禁用：真正连接 / 断开，状态实时显示（连接中 / 运行中 / 失败 / 已停止）。
 - 名称搜索、编辑、删除（两步确认）。
@@ -28,7 +30,7 @@ MCP 是**真实连接**：启用的服务器会通过 @deepseek-ai/dsh-mcp-clien
 
 ## 安装
 
-### 方式一：从 npm 安装（推荐）
+### 方式一：安装 GitHub Release 产物
 
 前置条件：Node.js >= 22.19，并先装好 dsh 命令行。
 
@@ -36,20 +38,20 @@ MCP 是**真实连接**：启用的服务器会通过 @deepseek-ai/dsh-mcp-clien
     npm install -g @deepseek-ai/dsh
     dsh --version      # 能打印版本号即成功
 
-    # 2. 把本插件装进 web profile
-    dsh plugin --profile web add @zebbkira/dsh-skills-mcp-manager@0.1.3
+    # 2. 解压 Release 中的 npm pack，再把目录装进 web profile
+    dsh plugin --profile web add link:<path-to-unpacked-release>
 
     # 3. 重启 dsh web
     dsh web
 
-dsh plugin 会把包装进 profile 并自动把它加入插件层（本包声明了 dsh.bundle.patch），无需手动改任何配置。版本号 @0.1.3 可换成 npm 上的最新版。
+桌面端会自动离线预置固定版本，无需用户手动安装；独立安装时使用 GitHub Release 产物，当前不发布到 npm。
 
 ### 方式二：从 GitHub 仓库安装（开发调试）
 
 用于改代码调试，需要 Node.js >= 22 与 pnpm：
 
     # 1. 克隆仓库
-    git clone https://github.com/zebbkira/dsh-skills-mcp-manager.git
+    git clone https://github.com/licn9901-arch/dsh-skills-mcp-manager.git
     cd dsh-skills-mcp-manager
 
     # 2. 安装依赖并构建

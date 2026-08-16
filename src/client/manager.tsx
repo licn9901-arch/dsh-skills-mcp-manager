@@ -1,17 +1,62 @@
-/**
- * The skills + MCP management UI rendered inside the settings card. Pure
- * React (no framework services): every data access goes through SkillsMcpApi,
- * which fetches the /api/dsh-skills-mcp routes. Inline Chinese copy mirrors
- * the original dynamic plugin; the card chrome above stays bilingual.
- */
-
-import { useEffect, useState, type ReactNode } from 'react'
+import {
+  Check,
+  ChevronLeft,
+  FileCode2,
+  FolderOpen,
+  Import,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Server,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { McpServerConfig, McpServerSummary, ScannedSkill, SkillDetail, SkillSummary } from '../protocol.ts'
 import { SkillsMcpApi } from './api.ts'
-import type { McpServerConfig, McpServerSummary, ScannedSkill, SkillSummary } from '../protocol.ts'
 import css from './settings-card.module.css'
 
-/** Stateless fetch client (created once per module). */
 const api = new SkillsMcpApi()
+
+const copy = {
+  zh: {
+    skills: 'Skills 技能', mcp: 'MCP 服务', searchSkills: '搜索技能', searchMcp: '搜索服务器',
+    all: '全部', enabled: '已启用', disabled: '已停用', refresh: '刷新', import: '导入技能',
+    project: '项目级', user: '用户级', emptySkills: '没有发现技能', noMatch: '没有匹配的结果',
+    chooseFolder: '选择文件夹', scan: '扫描目录', scanning: '扫描中...', importSelected: '导入选中',
+    noImport: '未发现可导入的技能', selectImport: '请先选择要导入的技能', detail: '技能详情',
+    selectSkill: '选择一个技能查看完整说明', whenToUse: '适用场景', content: '技能内容', delete: '删除',
+    deleteSkillTitle: '删除技能', deleteSkillBody: '此操作会从磁盘永久删除该技能，无法撤销。',
+    cancel: '取消', confirmDelete: '确认删除', newServer: '新建服务器', noServers: '尚未配置 MCP 服务器',
+    serverEditor: '服务器配置', editServer: '编辑服务器', save: '保存', saving: '保存中...',
+    test: '测试连接', testing: '测试中...', close: '关闭编辑器', running: '运行中', connecting: '连接中',
+    failed: '失败', stopped: '已停用', deleteServerTitle: '删除 MCP 服务器',
+    deleteServerBody: '服务器配置和当前连接会被移除，此操作无法撤销。', plaintext: '环境变量和请求头当前以明文保存在 ~/.dsh/mcp.json。',
+    selectServer: '选择服务器进行编辑，或新建一个服务器。', enable: '启用', disable: '停用',
+  },
+  en: {
+    skills: 'Skills', mcp: 'MCP services', searchSkills: 'Search skills', searchMcp: 'Search servers',
+    all: 'All', enabled: 'Enabled', disabled: 'Disabled', refresh: 'Refresh', import: 'Import skills',
+    project: 'Project', user: 'User', emptySkills: 'No skills found', noMatch: 'No matching results',
+    chooseFolder: 'Choose folder', scan: 'Scan folder', scanning: 'Scanning...', importSelected: 'Import selected',
+    noImport: 'No importable skills found', selectImport: 'Select at least one skill', detail: 'Skill details',
+    selectSkill: 'Select a skill to inspect its full instructions', whenToUse: 'When to use', content: 'Skill content', delete: 'Delete',
+    deleteSkillTitle: 'Delete skill', deleteSkillBody: 'This permanently deletes the skill from disk and cannot be undone.',
+    cancel: 'Cancel', confirmDelete: 'Delete', newServer: 'New server', noServers: 'No MCP servers configured',
+    serverEditor: 'Server configuration', editServer: 'Edit server', save: 'Save', saving: 'Saving...',
+    test: 'Test connection', testing: 'Testing...', close: 'Close editor', running: 'Running', connecting: 'Connecting',
+    failed: 'Failed', stopped: 'Disabled', deleteServerTitle: 'Delete MCP server',
+    deleteServerBody: 'The configuration and active connection will be removed. This cannot be undone.', plaintext: 'Environment values and headers are currently stored in plaintext at ~/.dsh/mcp.json.',
+    selectServer: 'Select a server to edit, or create a new one.', enable: 'Enable', disable: 'Disable',
+  },
+} as const
+
+type Copy = typeof copy.zh | typeof copy.en
+
+function useCopy(): Copy {
+  return document.documentElement.lang.toLowerCase().startsWith('en') ? copy.en : copy.zh
+}
 
 function sourceLabel(source: string): string {
   if (source === 'project-dsh') return '.dsh/skills'
@@ -21,421 +66,246 @@ function sourceLabel(source: string): string {
   return source
 }
 
-function parseKv(text: string): Record<string, string> {
-  const obj: Record<string, string> = {}
-  if (!text) return obj
-  text.split(/\n/).forEach((line) => {
-    const t = line.trim()
-    if (!t) return
-    const i = t.indexOf('=')
-    if (i < 0) return
-    obj[t.slice(0, i).trim()] = t.slice(i + 1).trim()
-  })
-  return obj
+const EMPTY_SERVER_JSON = JSON.stringify({
+  name: '',
+  transport: 'stdio',
+  command: 'npx',
+  args: [],
+  env: {},
+  enabled: true,
+}, null, 2)
+
+function serverConfig(server: McpServerSummary): McpServerConfig {
+  const { status: _status, error: _error, ...config } = server
+  return config
 }
 
-function kvText(obj: Record<string, string> | undefined): string {
-  return Object.keys(obj || {}).map((k) => k + '=' + (obj || {})[k]).join('\n')
-}
-
-interface McpForm {
-  name: string
-  transport: 'stdio' | 'streamable-http'
-  command: string
-  args: string
-  env: string
-  cwd: string
-  url: string
-  headers: string
-  mode: 'form' | 'json'
-  json: string
-}
-
-const EMPTY_FORM: McpForm = {
-  name: '', transport: 'stdio', command: '', args: '', env: '', cwd: '', url: '', headers: '', mode: 'form', json: '',
-}
-
-/** Top-level manager with the Skills / MCP tabs. */
+/** 技能与 MCP 的一级管理页面。 */
 export function SkillsMcpManager(props: { cwd: string; enabled: boolean; pickDirectory: () => Promise<string | null> }) {
+  const t = useCopy()
   const [tab, setTab] = useState<'skills' | 'mcp'>('skills')
-  const [refreshKey, setRefreshKey] = useState(0)
-  const bump = () => { setRefreshKey((k) => k + 1) }
-
   return (
     <div className={css.manager}>
-      <div className={css.tabs}>
-        <button type="button" className={tab === 'skills' ? css.tabActive : css.tab} onClick={() => { setTab('skills') }}>Skills 技能</button>
-        <button type="button" className={tab === 'mcp' ? css.tabActive : css.tab} onClick={() => { setTab('mcp') }}>MCP 服务</button>
+      <div className={css.tabs} role="tablist">
+        <button type="button" role="tab" aria-selected={tab === 'skills'} className={tab === 'skills' ? css.tabActive : css.tab} onClick={() => setTab('skills')}>{t.skills}</button>
+        <button type="button" role="tab" aria-selected={tab === 'mcp'} className={tab === 'mcp' ? css.tabActive : css.tab} onClick={() => setTab('mcp')}>{t.mcp}</button>
       </div>
-      {props.enabled
-        ? null
-        : <p className={css.disabledBanner} role="status">插件已禁用：路由与 MCP 连接均已停止，重新启用后刷新即可恢复。</p>}
-      {tab === 'skills'
-        ? <SkillsPanel cwd={props.cwd} refreshKey={refreshKey} onChanged={bump} pickDirectory={props.pickDirectory} />
-        : <McpPanel refreshKey={refreshKey} onChanged={bump} />}
+      {!props.enabled && <p className={css.errorBanner} role="status">Plugin disabled</p>}
+      {tab === 'skills' ? <SkillsPanel cwd={props.cwd} pickDirectory={props.pickDirectory} t={t} /> : <McpPanel t={t} />}
     </div>
   )
 }
 
-function SkillsPanel(props: { cwd: string; refreshKey: number; onChanged: () => void; pickDirectory: () => Promise<string | null> }) {
-  const [list, setList] = useState<{ loading: boolean; items: SkillSummary[]; error: string }>({ loading: true, items: [], error: '' })
-  const [detailName, setDetailName] = useState<string | null>(null)
-  const [detail, setDetail] = useState<{ path: string; data: any } | null>(null)
-  const [scan, setScan] = useState<{ dir: string; busy: boolean; items: ScannedSkill[]; selected: Record<string, boolean>; error: string; note: string }>({ dir: '', busy: false, items: [], selected: {}, error: '', note: '' })
-  const [busy, setBusy] = useState('')
-  const [msg, setMsg] = useState('')
-  const [confirmDel, setConfirmDel] = useState<string | null>(null)
+function SkillsPanel(props: { cwd: string; pickDirectory: () => Promise<string | null>; t: Copy }) {
+  const { t } = props
+  const [items, setItems] = useState<SkillSummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [query, setQuery] = useState('')
-  const [enabledFilter, setEnabledFilter] = useState<'all' | 'enabled' | 'disabled'>('all')
+  const [filter, setFilter] = useState<'all' | 'enabled' | 'disabled'>('all')
+  const [selected, setSelected] = useState<SkillSummary | null>(null)
+  const [detail, setDetail] = useState<SkillDetail | null>(null)
+  const [pending, setPending] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<SkillSummary | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [scan, setScan] = useState({ dir: '', busy: false, items: [] as ScannedSkill[], selected: new Set<string>(), message: '' })
 
-  const load = () => {
-    setList({ loading: true, items: [], error: '' })
-    api.listSkills(props.cwd).then((items) => {
-      setList({ loading: false, items, error: '' })
-    }).catch((e) => {
-      setList({ loading: false, items: [], error: String((e as Error)?.message || e) })
-    })
-  }
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try { setItems(await api.listSkills(props.cwd)) } catch (failure) { setError(String((failure as Error).message ?? failure)) } finally { setLoading(false) }
+  }, [props.cwd])
 
-  useEffect(() => { load() }, [props.cwd, props.refreshKey])
+  useEffect(() => { void load() }, [load])
 
-  const toggle = (skill: SkillSummary) => {
-    setBusy(skill.path)
-    setMsg('')
-    api.toggleSkill(skill.path, !skill.enabled).then(() => {
-      setBusy('')
-      load()
-    }).catch((e) => { setBusy(''); setMsg(String((e as Error)?.message || e)) })
-  }
-
-  const remove = (skill: SkillSummary) => {
-    if (confirmDel !== skill.path) { setConfirmDel(skill.path); return }
-    setConfirmDel(null)
-    setBusy(skill.path)
-    setMsg('')
-    api.deleteSkill(skill.path, skill.kind).then(() => {
-      setBusy('')
-      load()
-    }).catch((e) => { setBusy(''); setMsg(String((e as Error)?.message || e)) })
-  }
-
-  const view = (skill: SkillSummary) => {
-    if (detailName === skill.path) { setDetailName(null); setDetail(null); return }
-    setDetailName(skill.path)
+  const choose = async (skill: SkillSummary) => {
+    setSelected(skill)
     setDetail(null)
-    api.readSkill(skill.path).then((data) => {
-      setDetail({ path: skill.path, data })
-    }).catch((e) => {
-      setDetail({ path: skill.path, data: { error: String((e as Error)?.message || e) } })
-    })
+    try { setDetail(await api.readSkill(skill.path)) } catch (failure) { setError(String((failure as Error).message ?? failure)) }
   }
 
-  const chooseDir = () => {
-    props.pickDirectory().then((path) => {
-      if (path) setScan((prev) => ({ ...prev, dir: path, error: '' }))
-    }).catch((e) => {
-      setScan((prev) => ({ ...prev, error: String((e as Error)?.message || e) }))
-    })
+  const toggle = async (skill: SkillSummary) => {
+    setPending(skill.path)
+    setError('')
+    try { await api.toggleSkill(skill.path, !skill.enabled); await load() } catch (failure) { setError(String((failure as Error).message ?? failure)) } finally { setPending('') }
   }
 
-  const doScan = () => {
-    const dir = scan.dir.trim()
-    if (!dir) { setScan((prev) => ({ ...prev, error: '请输入目录路径' })); return }
-    setScan((prev) => ({ ...prev, busy: true, items: [], error: '', note: '' }))
-    api.scanSkills(dir).then((items) => {
-      setScan((prev) => ({ ...prev, busy: false, items, selected: {}, note: items.length === 0 ? '未发现可导入的技能' : '' }))
-    }).catch((e) => {
-      setScan((prev) => ({ ...prev, busy: false, items: [], error: String((e as Error)?.message || e) }))
-    })
+  const remove = async () => {
+    if (!deleteTarget) return
+    setPending(deleteTarget.path)
+    try {
+      await api.deleteSkill(deleteTarget.path, deleteTarget.kind)
+      if (selected?.path === deleteTarget.path) { setSelected(null); setDetail(null) }
+      setDeleteTarget(null)
+      await load()
+    } catch (failure) { setError(String((failure as Error).message ?? failure)) } finally { setPending('') }
   }
 
-  const toggleSelect = (sourcePath: string) => {
-    setScan((prev) => {
-      const selected = { ...prev.selected }
-      if (selected[sourcePath]) delete selected[sourcePath]
-      else selected[sourcePath] = true
-      return { ...prev, selected }
-    })
+  const scanDirectory = async () => {
+    if (scan.dir.trim() === '') { setScan((current) => ({ ...current, message: '请输入目录路径' })); return }
+    setScan((current) => ({ ...current, busy: true, message: '', items: [], selected: new Set() }))
+    try {
+      const found = await api.scanSkills(scan.dir.trim())
+      setScan((current) => ({ ...current, busy: false, items: found, message: found.length === 0 ? t.noImport : '' }))
+    } catch (failure) { setScan((current) => ({ ...current, busy: false, message: String((failure as Error).message ?? failure) })) }
   }
 
-  const doImport = () => {
-    const chosen = scan.items.filter((it) => scan.selected[it.sourcePath])
-    if (chosen.length === 0) { setScan((prev) => ({ ...prev, error: '请先勾选要导入的技能' })); return }
-    setScan((prev) => ({ ...prev, busy: true, error: '' }))
-    api.importSkills(chosen.map((it) => ({ sourcePath: it.sourcePath, kind: it.kind }))).then((results) => {
-      const imported = results.filter((x) => x.ok).length
-      setScan((prev) => ({ ...prev, busy: false, selected: {}, note: '已导入 ' + imported + ' 个技能' }))
-      load()
-    }).catch((e) => {
-      setScan((prev) => ({ ...prev, busy: false, error: String((e as Error)?.message || e) }))
-    })
+  const importSelected = async () => {
+    const chosen = scan.items.filter((item) => scan.selected.has(item.sourcePath))
+    if (chosen.length === 0) { setScan((current) => ({ ...current, message: t.selectImport })); return }
+    setScan((current) => ({ ...current, busy: true, message: '' }))
+    try {
+      const result = await api.importSkills(chosen.map(({ sourcePath, kind }) => ({ sourcePath, kind })))
+      const imported = result.filter((entry) => entry.ok).length
+      setScan((current) => ({ ...current, busy: false, selected: new Set(), message: `已导入 ${imported} 个技能` }))
+      await load()
+    } catch (failure) { setScan((current) => ({ ...current, busy: false, message: String((failure as Error).message ?? failure) })) }
   }
 
-  const q = query.trim().toLowerCase()
-  const filtered = list.items.filter((it) => {
-    if (q !== '' && !it.name.toLowerCase().includes(q)) return false
-    if (enabledFilter === 'enabled' && !it.enabled) return false
-    if (enabledFilter === 'disabled' && it.enabled) return false
-    return true
-  })
-  const byLevel: Record<string, SkillSummary[]> = {}
-  filtered.forEach((it) => { (byLevel[it.level] = byLevel[it.level] || []).push(it) })
-
-  const rows: ReactNode[] = []
-  ;[['project', '项目级'], ['user', '用户级']].forEach(([level, label]) => {
-    const gs = byLevel[level as string] || []
-    if (gs.length === 0) return
-    rows.push(<div key={'g-' + level} className={css.groupH}>{label} ({gs.length})</div>)
-    gs.forEach((skill) => {
-      const isBusy = busy === skill.path
-      rows.push(
-        <div key={skill.path} className={css.row}>
-          <div className={css.main} style={{ cursor: 'pointer' }} onClick={() => { view(skill) }}>
-            <div className={css.name}>{skill.name}{skill.enabled ? '' : ' （已禁用）'}</div>
-            {skill.description ? <div className={css.desc}>{skill.description}</div> : null}
-          </div>
-          <span className={css.badge}>{sourceLabel(skill.source)}</span>
-          <label className={css.switch}>
-            <input type="checkbox" checked={skill.enabled} disabled={isBusy} onChange={() => { toggle(skill) }} />
-            <span>{skill.enabled ? '启用' : '禁用'}</span>
-          </label>
-          <button type="button" className={css.btn} onClick={() => { view(skill) }}>{detailName === skill.path ? '收起' : '详情'}</button>
-          <button type="button" className={css.btnDanger} disabled={isBusy} onClick={() => { remove(skill) }}>{confirmDel === skill.path ? '确认删除?' : '删除'}</button>
-        </div>,
-      )
-      if (detailName === skill.path) {
-        const entry = detail
-        const d = (entry && entry.path === skill.path) ? entry.data : null
-        rows.push(
-          <div key={skill.path + '-detail'} className={css.detail}>
-            {d === null
-              ? <div>加载中…</div>
-              : d && d.error
-                ? <div>{d.error}</div>
-                : <div>
-                    <div className={css.name}>{d.description || skill.description}</div>
-                    {d.whenToUse ? <div className={css.desc}>When to use: {d.whenToUse}</div> : null}
-                    <pre className={css.pre}>{d.content || ''}</pre>
-                  </div>}
-          </div>,
-        )
-      }
-    })
-  })
+  const filtered = useMemo(() => items.filter((skill) => {
+    const matchesQuery = `${skill.name} ${skill.description}`.toLowerCase().includes(query.trim().toLowerCase())
+    const matchesStatus = filter === 'all' || (filter === 'enabled' ? skill.enabled : !skill.enabled)
+    return matchesQuery && matchesStatus
+  }), [filter, items, query])
 
   return (
     <div className={css.panel}>
-      <div className={css.section}>
-        <div className={css.h}>导入技能</div>
-        <div className={css.inline}>
-          <input className={css.inputGrow} placeholder="目录路径（含 SKILL.md 的技能目录或平铺 .md）" value={scan.dir} onChange={(e) => { setScan((prev) => ({ ...prev, dir: e.target.value })) }} />
-          <button type="button" className={css.btn} onClick={chooseDir}>选择文件夹</button>
-          <button type="button" className={css.btn} disabled={scan.busy} onClick={doScan}>{scan.busy ? '扫描中…' : '扫描目录'}</button>
-        </div>
-        {scan.error ? <div className={css.error}>{scan.error}</div> : null}
-        {scan.items.length > 0
-          ? <div className={css.scanList}>
-              {scan.items.map((it) => (
-                <label key={it.sourcePath} className={css.row}>
-                  <input type="checkbox" checked={!!scan.selected[it.sourcePath]} onChange={() => { toggleSelect(it.sourcePath) }} />
-                  <div className={css.main}>
-                    <div className={css.name}>{it.name}{it.kind === 'bundle' ? ' (目录)' : ' (文件)'}</div>
-                    {it.description ? <div className={css.desc}>{it.description}</div> : null}
-                  </div>
-                </label>
-              ))}
-              <button type="button" className={css.btn} disabled={scan.busy} onClick={doImport}>导入选中 ({Object.keys(scan.selected).length})</button>
-            </div>
-          : null}
-        {scan.note ? <div className={css.note}>{scan.note}</div> : null}
+      <div className={css.toolbar}>
+        <label className={css.search}><Search size={16} aria-hidden="true" /><input aria-label={t.searchSkills} placeholder={t.searchSkills} value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+        <select className={css.select} aria-label="状态筛选" value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}>
+          <option value="all">{t.all}</option><option value="enabled">{t.enabled}</option><option value="disabled">{t.disabled}</option>
+        </select>
+        <IconButton label={t.refresh} onClick={() => void load()}><RefreshCw size={17} /></IconButton>
+        <button type="button" className={css.primaryButton} onClick={() => setImportOpen((open) => !open)}><Import size={16} />{t.import}</button>
       </div>
-      <div className={css.section}>
-        <div className={css.inline}>
-          <div className={css.hGrow}>技能列表</div>
-          <button type="button" className={css.btn} onClick={load}>刷新</button>
+
+      {importOpen && <section className={css.importPanel} aria-label={t.import}>
+        <div className={css.importControls}>
+          <label className={css.pathInput}><FolderOpen size={17} /><input value={scan.dir} placeholder="C:\\path\\to\\skills" onChange={(event) => setScan((current) => ({ ...current, dir: event.target.value }))} /></label>
+          <button type="button" className={css.secondaryButton} onClick={async () => { const path = await props.pickDirectory(); if (path) setScan((current) => ({ ...current, dir: path })) }}>{t.chooseFolder}</button>
+          <button type="button" className={css.secondaryButton} disabled={scan.busy} onClick={() => void scanDirectory()}>{scan.busy ? t.scanning : t.scan}</button>
+          <IconButton label={t.close} onClick={() => setImportOpen(false)}><X size={17} /></IconButton>
         </div>
-        <div className={css.inline}>
-          <input className={css.inputGrow} placeholder="搜索技能名称…" value={query} onChange={(e) => { setQuery(e.target.value) }} />
-          <select className={css.filterSelect} value={enabledFilter} onChange={(e) => { setEnabledFilter(e.target.value as 'all' | 'enabled' | 'disabled') }}>
-            <option value="all">全部</option>
-            <option value="enabled">已启用</option>
-            <option value="disabled">未启用</option>
-          </select>
+        {scan.items.length > 0 && <div className={css.scanResults}>{scan.items.map((item) => <label key={item.sourcePath} className={css.scanRow}>
+          <input type="checkbox" checked={scan.selected.has(item.sourcePath)} onChange={() => setScan((current) => {
+            const selectedPaths = new Set(current.selected)
+            selectedPaths.has(item.sourcePath) ? selectedPaths.delete(item.sourcePath) : selectedPaths.add(item.sourcePath)
+            return { ...current, selected: selectedPaths }
+          })} />
+          <FileCode2 size={16} /><span><strong>{item.name}</strong><small>{item.description || item.sourcePath}</small></span>
+        </label>)}</div>}
+        {scan.message && <p className={css.inlineMessage}>{scan.message}</p>}
+        {scan.items.length > 0 && <button type="button" className={css.primaryButton} disabled={scan.busy} onClick={() => void importSelected()}><Check size={16} />{t.importSelected} ({scan.selected.size})</button>}
+      </section>}
+
+      {error && <div className={css.errorBanner} role="alert">{error}</div>}
+      <div className={css.masterDetail}>
+        <div className={css.listPane}>
+          {loading ? <LoadingRows /> : filtered.length === 0 ? <EmptyState icon={<FileCode2 />} text={items.length === 0 ? t.emptySkills : t.noMatch} /> : (['project', 'user'] as const).map((level) => {
+            const group = filtered.filter((skill) => skill.level === level)
+            if (group.length === 0) return null
+            return <section key={level} className={css.group}><h3>{level === 'project' ? t.project : t.user}<span>{group.length}</span></h3>{group.map((skill) => <div key={skill.path} className={`${css.listRow} ${selected?.path === skill.path ? css.listRowSelected : ''}`}>
+              <button type="button" className={css.rowMain} onClick={() => void choose(skill)}><strong>{skill.name}</strong><span>{skill.description || sourceLabel(skill.source)}</span></button>
+              <span className={css.source}>{sourceLabel(skill.source)}</span>
+              <Switch checked={skill.enabled} disabled={pending !== ''} label={`${skill.enabled ? t.disable : t.enable} ${skill.name}`} onChange={() => void toggle(skill)} />
+              <IconButton label={t.delete} danger disabled={pending !== ''} onClick={() => setDeleteTarget(skill)}><Trash2 size={16} /></IconButton>
+            </div>)}</section>
+          })}
         </div>
-        {msg ? <div className={css.error}>{msg}</div> : null}
-        {list.error ? <div className={css.error}>{list.error}</div> : null}
-        {list.loading
-          ? <div>加载中…</div>
-          : (filtered.length === 0 ? <div>{list.items.length === 0 ? '没有发现技能' : '没有匹配的技能'}</div> : rows)}
+        <aside className={css.detailPane} aria-label={t.detail}>
+          {!selected ? <EmptyState icon={<FileCode2 />} text={t.selectSkill} /> : <>
+            <div className={css.detailHeader}><div><h3>{selected.name}</h3><span>{sourceLabel(selected.source)}</span></div><Switch checked={selected.enabled} disabled={pending !== ''} label={`${selected.enabled ? t.disable : t.enable} ${selected.name}`} onChange={() => void toggle(selected)} /></div>
+            {!detail ? <LoadingRows count={3} /> : <div className={css.detailBody}>{detail.description && <p>{detail.description}</p>}{detail.whenToUse && <section><h4>{t.whenToUse}</h4><p>{detail.whenToUse}</p></section>}<section><h4>{t.content}</h4><pre>{detail.content}</pre></section></div>}
+          </>}
+        </aside>
       </div>
+      {deleteTarget && <ConfirmDialog title={t.deleteSkillTitle} body={t.deleteSkillBody} cancel={t.cancel} confirm={t.confirmDelete} onCancel={() => setDeleteTarget(null)} onConfirm={() => void remove()} />}
     </div>
   )
 }
 
-function McpPanel(props: { refreshKey: number; onChanged: () => void }) {
-  const [list, setList] = useState<{ loading: boolean; servers: McpServerSummary[]; error: string }>({ loading: true, servers: [], error: '' })
-  const [form, setForm] = useState<McpForm>(EMPTY_FORM)
-  const [busy, setBusy] = useState('')
-  const [msg, setMsg] = useState('')
-  const [confirmDel, setConfirmDel] = useState<string | null>(null)
+function McpPanel({ t }: { t: Copy }) {
+  const [servers, setServers] = useState<McpServerSummary[]>([])
+  const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [pending, setPending] = useState('')
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [jsonText, setJsonText] = useState(EMPTY_SERVER_JSON)
+  const [editingName, setEditingName] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<McpServerSummary | null>(null)
 
-  const load = () => {
-    setList({ loading: true, servers: [], error: '' })
-    api.listMcp().then((servers) => {
-      setList({ loading: false, servers, error: '' })
-    }).catch((e) => {
-      setList({ loading: false, servers: [], error: String((e as Error)?.message || e) })
-    })
+  const load = useCallback(async () => {
+    setLoading(true); setError('')
+    try { setServers(await api.listMcp()) } catch (failure) { setError(String((failure as Error).message ?? failure)) } finally { setLoading(false) }
+  }, [])
+  useEffect(() => { void load() }, [load])
+
+  const openNew = () => { setJsonText(EMPTY_SERVER_JSON); setEditingName(''); setEditorOpen(true); setMessage('') }
+  const openEdit = (server: McpServerSummary) => {
+    const config = serverConfig(server)
+    setJsonText(JSON.stringify(config, null, 2))
+    setEditingName(server.name)
+    setEditorOpen(true); setMessage('')
   }
-
-  useEffect(() => { load() }, [props.refreshKey])
-
-  const patch = (p: Partial<McpForm>) => { setForm((prev) => ({ ...prev, ...p })) }
-
   const buildServer = (): McpServerConfig | null => {
-    if (form.mode === 'json') {
-      try { return JSON.parse(form.json) as McpServerConfig }
-      catch (e) { setMsg('JSON 解析失败：' + String((e as Error)?.message || e)); return null }
-    }
-    const server: McpServerConfig = { name: form.name.trim(), transport: form.transport, enabled: true }
-    if (form.transport === 'stdio') {
-      server.command = form.command.trim()
-      server.args = form.args.split(/\n/).map((l) => l.trim()).filter((l) => l !== '')
-      server.cwd = form.cwd.trim()
-      server.env = parseKv(form.env)
-    } else {
-      server.url = form.url.trim()
-      server.headers = parseKv(form.headers)
-    }
-    return server
+    try { return JSON.parse(jsonText) as McpServerConfig } catch (failure) { setError(`JSON: ${String((failure as Error).message ?? failure)}`); return null }
   }
-
-  const save = (server: McpServerConfig | null) => {
-    if (!server) return
-    setBusy('save')
-    setMsg('')
-    api.saveMcp(server).then(() => {
-      setBusy('')
-      setMsg('已保存 ' + server.name)
-      setForm(EMPTY_FORM)
-      load()
-    }).catch((e) => { setBusy(''); setMsg(String((e as Error)?.message || e)) })
+  const save = async () => {
+    const server = buildServer(); if (!server) return
+    setPending('save'); setError('')
+    try { await api.saveMcp(server); setMessage(`已保存 ${server.name}`); setEditorOpen(false); await load() } catch (failure) { setError(String((failure as Error).message ?? failure)) } finally { setPending('') }
   }
-
-  const toggle = (s: McpServerSummary) => {
-    setMsg('')
-    api.setMcpEnabled(s.name, !s.enabled).then(() => { load() }).catch((e) => { setMsg(String((e as Error)?.message || e)) })
+  const test = async () => {
+    const server = buildServer(); if (!server) return
+    setPending('test'); setError('')
+    try { const result = await api.testMcp(server); setMessage(result.ok ? '连接成功' : `连接失败：${result.error ?? 'unknown error'}`) } catch (failure) { setError(String((failure as Error).message ?? failure)) } finally { setPending('') }
   }
-
-  const remove = (s: McpServerSummary) => {
-    if (confirmDel !== s.name) { setConfirmDel(s.name); return }
-    setConfirmDel(null)
-    setMsg('')
-    api.deleteMcp(s.name).then(() => { load() }).catch((e) => { setMsg(String((e as Error)?.message || e)) })
+  const toggle = async (server: McpServerSummary) => {
+    setPending(server.name)
+    try { await api.setMcpEnabled(server.name, !server.enabled); await load() } catch (failure) { setError(String((failure as Error).message ?? failure)) } finally { setPending('') }
   }
-
-  const edit = (s: McpServerSummary) => {
-    setForm({
-      name: s.name, transport: s.transport || 'stdio', command: s.command || '',
-      args: (s.args || []).join('\n'), env: kvText(s.env), cwd: s.cwd || '',
-      url: s.url || '', headers: kvText(s.headers), mode: 'form', json: JSON.stringify(s, null, 2),
-    })
-    setConfirmDel(null)
+  const remove = async () => {
+    if (!deleteTarget) return
+    setPending(deleteTarget.name)
+    try { await api.deleteMcp(deleteTarget.name); setDeleteTarget(null); await load() } catch (failure) { setError(String((failure as Error).message ?? failure)) } finally { setPending('') }
   }
+  const statusCopy = { running: t.running, connecting: t.connecting, failed: t.failed, stopped: t.stopped }
+  const filtered = servers.filter((server) => server.name.toLowerCase().includes(query.trim().toLowerCase()))
 
-  const test = (server: McpServerConfig | null) => {
-    if (!server) return
-    setBusy('test')
-    setMsg('')
-    api.testMcp(server).then((r) => {
-      setBusy('')
-      setMsg(r.ok ? '连接成功' : '连接失败：' + (r.error || 'unknown error'))
-    }).catch((e) => { setBusy(''); setMsg(String((e as Error)?.message || e)) })
-  }
-
-  const statusLabel: Record<string, string> = {
-    connecting: '连接中', running: '运行中', failed: '失败', stopped: '已停止',
-  }
-
-  const mq = query.trim().toLowerCase()
-  const filteredServers = list.servers.filter((s) => mq === '' || s.name.toLowerCase().includes(mq))
-
-  return (
-    <div className={css.panel}>
-      <div className={css.section}>
-        <div className={css.inline}>
-          <div className={css.hGrow}>MCP 服务器</div>
-          <input className={css.inputGrow} placeholder="搜索服务器名称…" value={query} onChange={(e) => { setQuery(e.target.value) }} />
-        </div>
-        {msg ? <div className={css.error}>{msg}</div> : null}
-        {list.error ? <div className={css.error}>{list.error}</div> : null}
-        {list.loading
-          ? <div>加载中…</div>
-          : (filteredServers.length === 0
-            ? <div>{list.servers.length === 0 ? '尚未配置任何 MCP 服务器' : '没有匹配的服务器'}</div>
-            : filteredServers.map((s) => (
-                <div key={s.name} className={css.row}>
-                  <div className={css.main}>
-                    <div className={css.name}>{s.name}{s.enabled ? '' : ' （已禁用）'} <span className={css.status}>{statusLabel[s.status] || s.status}</span></div>
-                    <div className={css.desc}>{s.transport}{s.transport === 'stdio' ? ' · ' + (s.command || '') : ' · ' + (s.url || '')}</div>
-                    {s.error ? <div className={css.error}>{s.error}</div> : null}
-                  </div>
-                  <label className={css.switch}>
-                    <input type="checkbox" checked={s.enabled} onChange={() => { toggle(s) }} />
-                    <span>{s.enabled ? '启用' : '禁用'}</span>
-                  </label>
-                  <button type="button" className={css.btn} onClick={() => { edit(s) }}>编辑</button>
-                  <button type="button" className={css.btnDanger} onClick={() => { remove(s) }}>{confirmDel === s.name ? '确认删除?' : '删除'}</button>
-                </div>
-              )))}
-      </div>
-      <div className={css.section}>
-        <div className={css.h}>新建 / 编辑服务器</div>
-        <div className={css.inline}>
-          <button type="button" className={form.mode === 'form' ? css.btnActive : css.btn} onClick={() => { patch({ mode: 'form' }) }}>表单</button>
-          <button type="button" className={form.mode === 'json' ? css.btnActive : css.btn} onClick={() => { patch({ mode: 'json' }) }}>JSON</button>
-        </div>
-        {form.mode === 'form'
-          ? <div className={css.form}>
-              <Field label="名称 name"><input className={css.input} value={form.name} placeholder="例如 github" onChange={(e) => { patch({ name: e.target.value }) }} /></Field>
-              <Field label="传输 transport">
-                <select className={css.input} value={form.transport} onChange={(e) => { patch({ transport: e.target.value as 'stdio' | 'streamable-http' }) }}>
-                  <option value="stdio">stdio</option>
-                  <option value="streamable-http">streamable-http</option>
-                </select>
-              </Field>
-              {form.transport === 'stdio'
-                ? <div>
-                    <Field label="命令 command"><input className={css.input} value={form.command} placeholder="npx" onChange={(e) => { patch({ command: e.target.value }) }} /></Field>
-                    <Field label="参数 args（每行一个）"><textarea className={css.input} rows={2} value={form.args} placeholder={'-y\n@modelcontextprotocol/server-github'} onChange={(e) => { patch({ args: e.target.value }) }} /></Field>
-                    <Field label="环境变量 env（KEY=VALUE 每行一个）"><textarea className={css.input} rows={2} value={form.env} onChange={(e) => { patch({ env: e.target.value }) }} /></Field>
-                    <Field label="工作目录 cwd"><input className={css.input} value={form.cwd} onChange={(e) => { patch({ cwd: e.target.value }) }} /></Field>
-                  </div>
-                : <div>
-                    <Field label="URL"><input className={css.input} value={form.url} placeholder="http://localhost:3000/mcp" onChange={(e) => { patch({ url: e.target.value }) }} /></Field>
-                    <Field label="请求头 headers（KEY=VALUE 每行一个）"><textarea className={css.input} rows={2} value={form.headers} onChange={(e) => { patch({ headers: e.target.value }) }} /></Field>
-                  </div>}
-              <div className={css.inline}>
-                <button type="button" className={css.btnPrimary} disabled={busy === 'save'} onClick={() => { save(buildServer()) }}>{busy === 'save' ? '保存中…' : '保存'}</button>
-                <button type="button" className={css.btn} disabled={busy === 'test'} onClick={() => { test(buildServer()) }}>{busy === 'test' ? '测试中…' : '测试连接'}</button>
-              </div>
-            </div>
-          : <div className={css.form}>
-              <textarea className={css.inputMono} rows={12} value={form.json} placeholder={'{\n  "name": "github",\n  "transport": "stdio",\n  "command": "npx",\n  "args": ["-y", "@modelcontextprotocol/server-github"],\n  "enabled": true\n}'} onChange={(e) => { patch({ json: e.target.value }) }} />
-              <button type="button" className={css.btnPrimary} disabled={busy === 'save'} onClick={() => { save(buildServer()) }}>{busy === 'save' ? '保存中…' : '保存'}</button>
-            </div>}
-        <div className={css.desc}>配置持久化到 ~/.dsh/mcp.json；启用的服务器经 @deepseek-ai/dsh-mcp-client 真实连接并把工具注册为 mcp__&lt;server&gt;__&lt;tool&gt;。</div>
-      </div>
+  return <div className={css.panel}>
+    <div className={css.toolbar}>
+      <label className={css.search}><Search size={16} /><input aria-label={t.searchMcp} placeholder={t.searchMcp} value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+      <IconButton label={t.refresh} onClick={() => void load()}><RefreshCw size={17} /></IconButton>
+      <button type="button" className={css.primaryButton} onClick={openNew}><Plus size={16} />{t.newServer}</button>
     </div>
-  )
+    {error && <div className={css.errorBanner} role="alert">{error}</div>}{message && <div className={css.successBanner} role="status">{message}</div>}
+    <div className={`${css.masterDetail} ${editorOpen ? css.editorVisible : ''}`}>
+      <div className={css.listPane}>
+        {loading ? <LoadingRows /> : filtered.length === 0 ? <EmptyState icon={<Server />} text={servers.length === 0 ? t.noServers : t.noMatch} /> : filtered.map((server) => <div key={server.name} className={css.serverRow}>
+          <button type="button" className={css.rowMain} onClick={() => openEdit(server)}><strong>{server.name}</strong><span>{server.transport} · {server.transport === 'stdio' ? server.command : server.url}</span>{server.error && <em>{server.error}</em>}</button>
+          <span className={`${css.status} ${css[`status_${server.status}`]}`}>{statusCopy[server.status]}</span>
+          <Switch checked={server.enabled !== false} disabled={pending !== ''} label={`${server.enabled !== false ? t.disable : t.enable} ${server.name}`} onChange={() => void toggle(server)} />
+          <IconButton label={t.editServer} onClick={() => openEdit(server)}><Pencil size={16} /></IconButton>
+          <IconButton label={t.delete} danger onClick={() => setDeleteTarget(server)}><Trash2 size={16} /></IconButton>
+        </div>)}
+      </div>
+      <aside className={css.editorPane} aria-label={t.serverEditor}>
+        {!editorOpen ? <EmptyState icon={<Server />} text={t.selectServer} /> : <>
+          <div className={css.editorHeader}><button type="button" className={css.backButton} aria-label={t.close} onClick={() => setEditorOpen(false)}><ChevronLeft size={18} /></button><h3>{editingName ? t.editServer : t.newServer}</h3><IconButton label={t.close} onClick={() => setEditorOpen(false)}><X size={18} /></IconButton></div>
+          <textarea className={css.codeEditor} aria-label="MCP JSON" rows={22} spellCheck={false} value={jsonText} onChange={(event) => setJsonText(event.target.value)} />
+          <p className={css.plaintextNote}>{t.plaintext}</p>
+          <div className={css.editorActions}><button type="button" className={css.secondaryButton} disabled={pending !== ''} onClick={() => void test()}>{pending === 'test' ? t.testing : t.test}</button><button type="button" className={css.primaryButton} disabled={pending !== ''} onClick={() => void save()}>{pending === 'save' ? t.saving : t.save}</button></div>
+        </>}
+      </aside>
+    </div>
+    {deleteTarget && <ConfirmDialog title={t.deleteServerTitle} body={t.deleteServerBody} cancel={t.cancel} confirm={t.confirmDelete} onCancel={() => setDeleteTarget(null)} onConfirm={() => void remove()} />}
+  </div>
 }
 
-function Field(props: { label: string; children: ReactNode }) {
-  return (
-    <label className={css.fieldLabel}>
-      <span className={css.fieldName}>{props.label}</span>
-      {props.children}
-    </label>
-  )
-}
+function IconButton({ label, children, danger = false, disabled = false, onClick }: { label: string; children: ReactNode; danger?: boolean; disabled?: boolean; onClick: () => void }) { return <button type="button" className={`${css.iconButton} ${danger ? css.danger : ''}`} aria-label={label} title={label} disabled={disabled} onClick={onClick}>{children}</button> }
+function Switch({ checked, disabled, label, onChange }: { checked: boolean; disabled: boolean; label: string; onChange: () => void }) { return <button type="button" role="switch" aria-checked={checked} aria-label={label} className={css.switch} disabled={disabled} onClick={onChange}><span /></button> }
+function EmptyState({ icon, text, action }: { icon: ReactNode; text: string; action?: ReactNode }) { return <div className={css.empty}>{icon}<p>{text}</p>{action}</div> }
+function LoadingRows({ count = 5 }: { count?: number }) { return <div className={css.loading} aria-label="loading">{Array.from({ length: count }, (_, index) => <span key={index} />)}</div> }
+function ConfirmDialog({ title, body, cancel, confirm, onCancel, onConfirm }: { title: string; body: string; cancel: string; confirm: string; onCancel: () => void; onConfirm: () => void }) { return <div className={css.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel() }}><div className={css.dialog} role="alertdialog" aria-modal="true" aria-labelledby="confirm-title"><h3 id="confirm-title">{title}</h3><p>{body}</p><div><button type="button" className={css.secondaryButton} onClick={onCancel}>{cancel}</button><button type="button" className={css.dangerButton} onClick={onConfirm}>{confirm}</button></div></div></div> }

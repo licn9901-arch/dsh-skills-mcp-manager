@@ -1,11 +1,11 @@
 {
-  "name": "@zebbkira/dsh-skills-mcp-manager",
+  "name": "@dsh-desktop/skills-mcp-manager",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zebbkira/dsh-skills-mcp-manager.git"
+    "url": "git+https://github.com/licn9901-arch/dsh-skills-mcp-manager.git"
   },
-  "description": "Skills & MCP manager for the dsh web GUI: browse/enable/import/delete skills across project and user roots, and manage MCP servers with a REAL connection through @deepseek-ai/dsh-mcp-client (enabled servers connect and register their tools on ctx.tools; enable/disable actually connects/disconnects). Hot-pluggable — mounted via a profile bundle patch + node_modules symlink, no dsh source changes.",
-  "version": "0.1.3",
+  "description": "Desktop-maintained Skills and MCP manager for the DeepSeek Harness web UI.",
+  "version": "0.2.0",
   "type": "module",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
@@ -38,6 +38,7 @@
     }
   },
   "dependencies": {
+    "lucide-react": "^0.468.0",
     "schemastery": "^3.18.0"
   },
   "peerDependencies": {
@@ -56,6 +57,9 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.6",
@@ -78,7 +82,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "schemastery": "^3.18.0",
-    "tsdown": "0.22.2",
+    "tsdown": "0.22.14",
     "typescript": "~5.7.2",
     "vitest": "^3.0.0"
   },
@@ -89,15 +93,15 @@
     "lib/**/*.d.ts.map",
     "src",
     "cordis.patch.yml",
+    "LICENSE",
     "README.md"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
   "license": "MIT",
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsdown && node scripts/wrap-client.mjs",
     "bundle": "tsdown && node scripts/wrap-client.mjs",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "watch": "tsdown --watch",
     "typecheck": "tsc --noEmit"
   }
