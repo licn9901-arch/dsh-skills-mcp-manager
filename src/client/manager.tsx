@@ -22,7 +22,7 @@ const api = new SkillsMcpApi()
 const copy = {
   zh: {
     skills: 'Skills 技能', mcp: 'MCP 服务', searchSkills: '搜索技能', searchMcp: '搜索服务器',
-    all: '全部', enabled: '已启用', disabled: '已停用', refresh: '刷新', import: '导入技能',
+    statusFilter: '状态筛选', all: '全部', enabled: '已启用', disabled: '已停用', refresh: '刷新', import: '导入技能',
     project: '项目级', user: '用户级', emptySkills: '没有发现技能', noMatch: '没有匹配的结果',
     chooseFolder: '选择文件夹', scan: '扫描目录', scanning: '扫描中...', importSelected: '导入选中',
     noImport: '未发现可导入的技能', selectImport: '请先选择要导入的技能', detail: '技能详情',
@@ -37,7 +37,7 @@ const copy = {
   },
   en: {
     skills: 'Skills', mcp: 'MCP services', searchSkills: 'Search skills', searchMcp: 'Search servers',
-    all: 'All', enabled: 'Enabled', disabled: 'Disabled', refresh: 'Refresh', import: 'Import skills',
+    statusFilter: 'Status filter', all: 'All', enabled: 'Enabled', disabled: 'Disabled', refresh: 'Refresh', import: 'Import skills',
     project: 'Project', user: 'User', emptySkills: 'No skills found', noMatch: 'No matching results',
     chooseFolder: 'Choose folder', scan: 'Scan folder', scanning: 'Scanning...', importSelected: 'Import selected',
     noImport: 'No importable skills found', selectImport: 'Select at least one skill', detail: 'Skill details',
@@ -172,9 +172,11 @@ function SkillsPanel(props: { cwd: string; pickDirectory: () => Promise<string |
     <div className={css.panel}>
       <div className={css.toolbar}>
         <label className={css.search}><Search size={16} aria-hidden="true" /><input aria-label={t.searchSkills} placeholder={t.searchSkills} value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-        <select className={css.select} aria-label="状态筛选" value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)}>
-          <option value="all">{t.all}</option><option value="enabled">{t.enabled}</option><option value="disabled">{t.disabled}</option>
-        </select>
+        <div className={css.filterGroup} role="group" aria-label={t.statusFilter}>
+          {(['all', 'enabled', 'disabled'] as const).map((value) => (
+            <button key={value} type="button" className={css.filterButton} aria-pressed={filter === value} onClick={() => setFilter(value)}>{t[value]}</button>
+          ))}
+        </div>
         <IconButton label={t.refresh} onClick={() => void load()}><RefreshCw size={17} /></IconButton>
         <button type="button" className={css.primaryButton} onClick={() => setImportOpen((open) => !open)}><Import size={16} />{t.import}</button>
       </div>
